@@ -1,3 +1,29 @@
+/**
+ * Browser startpage: Groups (tabs) of Panels that hold Links. Plain JavaScript with no
+ * build step and no server; everything is stored in localStorage. See GLOSSARY.md for the
+ * vocabulary and tools/README.md for the icon lists.
+ *
+ * @typedef {Object} Link
+ * @property {string} id
+ * @property {string} name
+ * @property {string} url - Always includes a scheme (see normalizeUrl).
+ * @property {string|null} icon - Icon id like "bi:house" or "fab:github", or null.
+ *
+ * @typedef {Object} Panel
+ * @property {string} id
+ * @property {string} title
+ * @property {string} bg - Background color, #rrggbb.
+ * @property {string|null} textColor - Custom text color, or null for automatic contrast.
+ * @property {string|null} icon - Icon id shown before the title, or null.
+ * @property {string} description - Plain text; may be empty.
+ * @property {'top'|'bottom'} descPos - Whether the description is above or below the links.
+ * @property {Link[]} links
+ *
+ * @typedef {Object} Group
+ * @property {string} id
+ * @property {string} name
+ * @property {Panel[]} panels
+ */
 (() => {
   'use strict';
 
@@ -22,12 +48,23 @@
   }));
   const ALL_ICONS = [...ICON_BY_ID.values()];
 
+  /**
+   * Normalise a stored icon value to a "<set>:<name>" id.
+   * @param {*} v - A stored value: "bi:house", "fab:github", or a legacy bare name like "house".
+   * @returns {string|null} The canonical id, or null if it names no known icon.
+   */
   function normalizeIcon(v) {
     if (typeof v !== 'string') return null;
     if (ICON_BY_ID.has(v)) return v;
     return ICON_BY_ID.has('bi:' + v) ? 'bi:' + v : null;
   }
 
+  /**
+   * Build the <i> element for an icon.
+   * @param {string} id - A valid icon id (see normalizeIcon).
+   * @param {string} [extra] - Extra CSS classes, e.g. a margin utility.
+   * @returns {HTMLElement}
+   */
   function iconEl(id, extra) {
     const i = ICON_BY_ID.get(id);
     return h('i', { class: i.set.cls(i.name) + (extra ? ' ' + extra : '') });
@@ -45,15 +82,38 @@
 
   // ---------- helpers ----------
 
+  /**
+   * Short random id, unique enough for items within one startpage.
+   * @returns {string}
+   */
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+  /**
+   * True if v is a #rrggbb color string.
+   * @param {*} v
+   * @returns {boolean}
+   */
   const isHex = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
 
+  /**
+   * Pick a readable text color for a background color.
+   * @param {string} bg - Background as #rrggbb.
+   * @returns {string} '#111111' for light backgrounds, '#ffffff' for dark ones.
+   */
   function autoText(bg) {
     const n = parseInt(bg.slice(1), 16);
     const r = n >> 16, g = (n >> 8) & 255, b = n & 255;
     return (r * 299 + g * 587 + b * 114) / 1000 >= 140 ? '#111111' : '#ffffff';
   }
 
+  /**
+   * Create a DOM element without touching innerHTML, so user text is never parsed as HTML.
+   * @param {string} tag
+   * @param {Object<string, *>} [props] - Attributes. `class` and `style` are set directly;
+   *   null/undefined/false values are skipped; `true` becomes an empty attribute.
+   * @param {...(Node|string|null|false|Array)} kids - Children. Strings become text nodes;
+   *   null/false are skipped; arrays are flattened.
+   * @returns {HTMLElement}
+   */
   function h(tag, props = {}, ...kids) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(props)) {
@@ -69,8 +129,22 @@
     return el;
   }
 
+  /**
+   * Bootstrap Icons element used for the app's own UI (not user-chosen icons).
+   * @param {string} name - Icon name without the "bi-" prefix.
+   * @returns {HTMLElement}
+   */
   const icon = (name) => h('i', { class: 'bi bi-' + name });
 
+  /**
+   * Small icon-only button wired to the delegated click handler via data-action.
+   * @param {string} action - Value for data-action; see the click handler switch.
+   * @param {string} iconName - Bootstrap Icons name.
+   * @param {string} label - Tooltip and accessible name.
+   * @param {string} [extra] - Extra CSS classes (e.g. 'edit-only').
+   * @param {boolean} [disabled]
+   * @returns {HTMLButtonElement}
+   */
   function iconBtn(action, iconName, label, extra = '', disabled = false) {
     return h('button', {
       type: 'button', class: 'icon-btn ' + extra, 'data-action': action,
@@ -80,6 +154,12 @@
 
   // ---------- URL handling ----------
 
+  /**
+   * Validate a user-typed URL and add https:// when no scheme was given.
+   * Only http, https, file and mailto are accepted.
+   * @param {string} input
+   * @returns {{ok: true, value: string} | {ok: false, error: string}}
+   */
   function normalizeUrl(input) {
     let s = String(input || '').trim();
     if (!s) return { ok: false, error: 'Enter a URL.' };
@@ -96,6 +176,14 @@
 
   // ---------- persistence ----------
 
+  /**
+   * Validate and clean parsed JSON (saved data or an imported file) into Groups.
+   * Accepts format version 2 (groups) and version 1 (a flat panel list, which becomes one
+   * "Home" Group). Every item gets a fresh id.
+   * @param {*} obj - The parsed JSON.
+   * @returns {Group[]}
+   * @throws {Error} With a user-readable message if the data is not a valid startpage.
+   */
   function sanitizeData(obj) {
     if (!obj || typeof obj !== 'object') throw new Error('This is not a Startpage file.');
     // Version 1 had no Groups: its Panels become a single "Home" Group.
@@ -112,6 +200,13 @@
     });
   }
 
+  /**
+   * Clean a list of raw panels, including their links. Unknown or invalid colors, icons
+   * and positions fall back to defaults; an invalid URL throws.
+   * @param {Array} list
+   * @returns {Panel[]}
+   * @throws {Error} With a user-readable message.
+   */
   function sanitizePanels(list) {
     const panels = list.map((p, i) => {
       if (!p || typeof p.title !== 'string') throw new Error('Panel ' + (i + 1) + ' has no title.');
@@ -138,8 +233,17 @@
     return panels;
   }
 
+  /**
+   * Trim and cap the page title at 60 characters, falling back to the default.
+   * @param {*} t
+   * @returns {string}
+   */
   const cleanTitle = (t) => (typeof t === 'string' && t.trim() ? t.trim().slice(0, 60) : DEFAULT_TITLE);
 
+  /**
+   * Load state from localStorage into `state`. If the saved data can't be read, it is kept
+   * under STORAGE_KEY + '.corrupt', the page starts empty and a toast explains.
+   */
   function load() {
     let raw = null;
     try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { /* storage unavailable */ }
@@ -157,6 +261,9 @@
     }
   }
 
+  /**
+   * Write `state` to localStorage. Warns once with a toast if storage is unavailable or full.
+   */
   function save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -176,6 +283,15 @@
 
   // ---------- toasts & confirm ----------
 
+  /**
+   * Show a Bootstrap toast at the bottom of the page.
+   * @param {string} message
+   * @param {Object} [opts]
+   * @param {string} [opts.variant] - Bootstrap color name, e.g. 'danger'.
+   * @param {string} [opts.action] - Label for an optional action button (e.g. 'Undo').
+   * @param {Function} [opts.onAction] - Called when the action button is clicked.
+   * @param {number} [opts.delay] - Milliseconds before it hides.
+   */
   function toast(message, { variant = 'dark', action, onAction, delay = 4000 } = {}) {
     const body = h('div', { class: 'toast-body flex-grow-1' }, message);
     const wrap = h('div', { class: 'd-flex align-items-center' }, body);
@@ -192,6 +308,15 @@
   }
 
   const confirmModal = bootstrap.Modal.getOrCreateInstance($('#confirmModal'));
+  /**
+   * Ask the user to confirm something in a modal.
+   * @param {Object} opts
+   * @param {string} opts.title
+   * @param {string} opts.body
+   * @param {string} [opts.okText]
+   * @param {boolean} [opts.danger] - Style the confirm button as destructive.
+   * @returns {Promise<boolean>} true if confirmed; false if cancelled or dismissed.
+   */
   function confirmDialog({ title, body, okText = 'Confirm', danger = true }) {
     return new Promise((resolve) => {
       let done = false;
@@ -210,6 +335,10 @@
 
   // ---------- rendering ----------
 
+  /**
+   * Rebuild the whole page from `state`: top bar, group tabs and the active Group's panels.
+   * Call after every state change (and after `save()` when persisting).
+   */
   function render() {
     document.body.classList.toggle('editing', editMode);
     const editBtn = $('#editBtn');
@@ -231,6 +360,12 @@
     rootEl.replaceChildren(...panels.map(panelEl));
   }
 
+  /**
+   * Build the tab for one Group.
+   * @param {Group} g
+   * @param {number} i - Index in state.groups (used to disable the end arrows).
+   * @returns {HTMLElement}
+   */
   function tabEl(g, i) {
     const active = g.id === state.activeId;
     return h('li', { class: 'nav-item', role: 'presentation', 'data-group-id': g.id, draggable: editMode ? 'true' : null },
@@ -242,11 +377,21 @@
         iconBtn('group-delete', 'trash', 'Delete group', 'edit-only', state.groups.length === 1)));
   }
 
+  /**
+   * Build the "+" tab that adds a new Group.
+   * @returns {HTMLElement}
+   */
   function addTabEl() {
     return h('li', { class: 'nav-item' },
       h('button', { type: 'button', class: 'nav-link', 'data-action': 'group-add', 'data-tip': 'Add a new group (tab)', 'aria-label': 'Add a new group' }, icon('plus-lg')));
   }
 
+  /**
+   * Build the column holding one Panel: header, optional description and its links.
+   * @param {Panel} p
+   * @param {number} i - Index in the active Group (used to disable the end arrows).
+   * @returns {HTMLElement}
+   */
   function panelEl(p, i) {
     const fg = p.textColor || autoText(p.bg);
     const desc = p.description ? h('div', { class: 'panel-desc panel-desc-' + p.descPos }, p.description) : null;
@@ -267,6 +412,13 @@
         p.descPos === 'bottom' && desc));
   }
 
+  /**
+   * Build the list item for one Link.
+   * @param {Link} l
+   * @param {number} j - Index in its Panel.
+   * @param {number} count - Number of links in its Panel.
+   * @returns {HTMLElement}
+   */
   function linkEl(l, j, count) {
     return h('li', { class: 'link-item d-flex align-items-center gap-1', 'data-link-id': l.id },
       h('span', { class: 'icon-btn drag-handle edit-only pointer-only', 'data-drag': 'link', draggable: 'true', 'data-tip': 'Drag to re-order, or drop on another panel', 'aria-label': 'Drag to move link' }, icon('grip-vertical')),
@@ -279,15 +431,41 @@
 
   // ---------- state mutations ----------
 
+  /**
+   * Total number of Panels across the given Groups.
+   * @param {Group[]} groups
+   * @returns {number}
+   */
   const countPanels = (groups) => groups.reduce((n, g) => n + g.panels.length, 0);
+  /**
+   * The Group currently shown.
+   * @returns {Group}
+   */
   const curGroup = () => state.groups.find((g) => g.id === state.activeId);
+  /**
+   * Find a Panel by id in the current Group only.
+   * @param {string} id
+   * @returns {Panel|undefined}
+   */
   const findPanel = (id) => curGroup().panels.find((p) => p.id === id);
 
+  /**
+   * Move an item within an array in place; does nothing if `to` is out of range.
+   * @param {Array} arr
+   * @param {number} from
+   * @param {number} to
+   */
   function moveInArray(arr, from, to) {
     if (to < 0 || to >= arr.length) return;
     arr.splice(to, 0, arr.splice(from, 1)[0]);
   }
 
+  /**
+   * Move a Panel next to another Panel in the current Group (drag and drop).
+   * @param {string} id - Panel being moved.
+   * @param {string} targetId - Panel it lands next to.
+   * @param {boolean} after - Place after the target rather than before.
+   */
   function movePanel(id, targetId, after) {
     const panels = curGroup().panels;
     const from = panels.findIndex((p) => p.id === id);
@@ -296,6 +474,13 @@
     panels.splice(to + (after ? 1 : 0), 0, panel);
   }
 
+  /**
+   * Move a Link to a position in a Panel of the current Group, possibly a different Panel.
+   * @param {string} id - Link being moved.
+   * @param {string} toPanelId - Destination Panel.
+   * @param {string|null} targetLinkId - Link it lands next to, or null to append at the end.
+   * @param {boolean} after - Place after the target rather than before.
+   */
   function moveLink(id, toPanelId, targetLinkId, after) {
     let link = null;
     for (const p of curGroup().panels) {
@@ -309,8 +494,16 @@
   }
 
   // ---------- icon picker ----------
-  // A searchable grid of Bootstrap Icons, built inside `mount`. Used by the Panel and Link dialogs.
 
+  /**
+   * Build a searchable icon picker (set filter, keyword search, paged grid) inside `mount`.
+   * Used by both the Panel and Link dialogs.
+   * @param {HTMLElement} mount - Container the picker is rendered into.
+   * @param {function(string|null): void} [onChange] - Called when the user picks or clears an icon.
+   * @returns {{get: function(): (string|null), set: function((string|null)): void}}
+   *   `get` returns the selected icon id; `set` resets to a value without calling onChange,
+   *   and also closes the picker and clears the search.
+   */
   function createIconPicker(mount, onChange = () => {}) {
     let value = null;
     let matches = [];
@@ -332,6 +525,9 @@
 
     const isOpen = () => !panel.classList.contains('d-none');
 
+    /**
+     * Refresh the toggle button's icon, label and the Clear button from `value`.
+     */
     function sync() {
       const cur = value && ICON_BY_ID.get(value);
       toggleIcon.replaceChildren(cur ? iconEl(value) : h('i', { class: 'bi bi-image' }));
@@ -339,6 +535,10 @@
       clear.disabled = !value;
     }
 
+    /**
+     * Draw one page of `matches` into the grid.
+     * @param {boolean} append - Add to the existing icons ('Show more') instead of starting over.
+     */
     function renderGrid(append) {
       if (!append) { grid.replaceChildren(); shown = 0; grid.scrollTop = 0; }
       const batch = matches.slice(shown, shown + ICON_PAGE);
@@ -351,6 +551,9 @@
       more.classList.toggle('d-none', shown >= matches.length);
     }
 
+    /**
+     * Recompute `matches` from the search text and set filter, then redraw the grid from the start.
+     */
     function filter() {
       const terms = search.value.toLowerCase().split(/\s+/).filter(Boolean);
       matches = ALL_ICONS.filter((i) => (setSel.value === 'all' || i.set.id === setSel.value) && terms.every((t) => i.hay.includes(t)));
@@ -362,6 +565,10 @@
       renderGrid(false);
     }
 
+    /**
+     * Show or hide the picker panel; opening it runs the filter and focuses the search box.
+     * @param {boolean} open
+     */
     function setOpen(open) {
       panel.classList.toggle('d-none', !open);
       toggle.setAttribute('aria-expanded', String(open));
@@ -403,11 +610,23 @@
   let linkCtx = null;
   const linkIcon = createIconPicker($('#linkIconPicker'));
 
+  /**
+   * Mark a form input valid or invalid. The error text goes in the element right after the
+   * input (a Bootstrap .invalid-feedback).
+   * @param {HTMLInputElement} input
+   * @param {string|null} msg - Error text, or null to clear the error.
+   */
   function setInvalid(input, msg) {
     input.classList.toggle('is-invalid', !!msg);
     if (msg) input.nextElementSibling.textContent = msg;
   }
 
+  /**
+   * Open the Link dialog to add a link, or edit one.
+   * @param {Object} opts
+   * @param {string} opts.panelId - Panel to add to, or the Panel that holds the Link being edited.
+   * @param {string} [opts.linkId] - Link to edit; omit to add a new one.
+   */
   function openLinkDialog({ panelId, linkId }) {
     linkCtx = { linkId, fromPanelId: panelId };
     const link = linkId ? findPanel(panelId).links.find((l) => l.id === linkId) : null;
@@ -455,12 +674,20 @@
   const panelModal = bootstrap.Modal.getOrCreateInstance($('#panelModal'));
   let panelCtx = null;
 
+  /**
+   * Read the Panel dialog's colors.
+   * @returns {{bg: string, fg: string, custom: boolean}} Background, effective text color,
+   *   and whether a custom text color is selected.
+   */
   function currentPanelColors() {
     const bg = $('#panelBg').value;
     const custom = $('#textCustom').checked;
     return { bg, fg: custom ? $('#panelText').value : autoText(bg), custom };
   }
 
+  /**
+   * Refresh the Panel dialog's live preview (colors, icon and title).
+   */
   function updatePanelPreview() {
     const { bg, fg, custom } = currentPanelColors();
     $('#panelText').disabled = !custom;
@@ -473,6 +700,10 @@
 
   const panelIcon = createIconPicker($('#panelIconPicker'), updatePanelPreview);
 
+  /**
+   * Open the Panel dialog to create a Panel, or edit one.
+   * @param {string|null} panelId - Panel to edit, or null to create a new one.
+   */
   function openPanelDialog(panelId) {
     const p = panelId ? findPanel(panelId) : null;
     panelCtx = { panelId };
@@ -535,6 +766,10 @@
   const groupModal = bootstrap.Modal.getOrCreateInstance($('#groupModal'));
   let groupCtx = null;
 
+  /**
+   * Open the Group dialog to add a Group, or rename one.
+   * @param {string|null} groupId - Group to rename, or null to add a new one.
+   */
   function openGroupDialog(groupId) {
     const g = groupId ? state.groups.find((x) => x.id === groupId) : null;
     groupCtx = { groupId };
@@ -583,6 +818,10 @@
 
   // ---------- export / import ----------
 
+  /**
+   * Download the whole startpage as a JSON file and record the export time.
+   * The file also carries the page's location as an informational field that import ignores.
+   */
   function exportJson() {
     state.lastExported = new Date().toISOString();
     const out = {
@@ -731,11 +970,21 @@
 
   const DROP_CLASSES = ['drop-left', 'drop-right', 'drop-top', 'drop-bottom', 'drop-end'];
 
+  /**
+   * Remove all drag-and-drop highlight classes and the dragged item's faded style.
+   */
   function clearDrag() {
     document.querySelectorAll('.' + DROP_CLASSES.join(',.')).forEach((el) => el.classList.remove(...DROP_CLASSES));
     document.querySelectorAll('.dragging').forEach((el) => el.classList.remove('dragging'));
   }
 
+  /**
+   * Work out what a drag over the panels area would do.
+   * @param {DragEvent} e
+   * @returns {{kind: 'panel'|'link'|'link-end', el: HTMLElement, after?: boolean, targetId?: string,
+   *   panelId?: string, horizontal?: boolean}|null} The drop target and where it would land, or
+   *   null if dropping here isn't allowed.
+   */
   function resolveDrop(e) {
     if (!drag || drag.type === 'group') return null;
     const col = e.target.closest && e.target.closest('[data-panel-id]');
@@ -805,6 +1054,12 @@
   // Re-ordering Groups: drag a tab onto another tab.
   const tabsEl = $('#groupTabs');
 
+  /**
+   * Work out what a drag over the group tabs would do.
+   * @param {DragEvent} e
+   * @returns {{el: HTMLElement, targetId: string, after: boolean}|null} null if not dragging a tab
+   *   or hovering over the dragged tab itself.
+   */
   function resolveTabDrop(e) {
     if (!drag || drag.type !== 'group') return null;
     const li = e.target.closest('[data-group-id]');
@@ -854,12 +1109,19 @@
   let tipEl = null;
   let tipInst = null;
 
+  /**
+   * Dispose the active tooltip and remove any tooltip elements left in the page.
+   */
   function hideTips() {
     if (tipInst) tipInst.dispose();
     tipInst = tipEl = null;
     document.querySelectorAll('.tooltip').forEach((t) => t.remove());
   }
 
+  /**
+   * Show a tooltip for an element, using its data-tip text. Only one is shown at a time.
+   * @param {HTMLElement} el
+   */
   function showTip(el) {
     if (el === tipEl) return;
     hideTips();
