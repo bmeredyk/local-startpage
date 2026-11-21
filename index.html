@@ -31,6 +31,10 @@
     .editing .link-name { cursor: default; }
     .editing .link-item { cursor: grab; }
     .empty-hint { opacity: .6; padding: .25rem .5rem; }
+    .panel-desc { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; opacity: .85; padding: 0 1rem; }
+    .panel-desc-top { padding-bottom: .25rem; }
+    .panel-desc-bottom { padding-top: .6rem; padding-bottom: .85rem; margin: 0 .5rem; padding-left: .5rem; padding-right: .5rem; border-top: 1px solid rgba(128, 128, 128, .35); }
+    .panel .links:has(+ .panel-desc-bottom) { padding-bottom: .5rem; }
 
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -205,6 +209,17 @@
             <label for="panelTitle" class="form-label">Title</label>
             <input type="text" class="form-control" id="panelTitle" autocomplete="off">
             <div class="invalid-feedback"></div>
+          </div>
+          <div class="mb-3">
+            <label for="panelDesc" class="form-label">Description <span class="text-body-secondary">(optional)</span></label>
+            <textarea class="form-control" id="panelDesc" rows="3" maxlength="2000"></textarea>
+            <div class="d-flex align-items-center gap-2 mt-2">
+              <label for="panelDescPos" class="form-label mb-0 small">Show</label>
+              <select class="form-select form-select-sm w-auto" id="panelDescPos">
+                <option value="top">above the links</option>
+                <option value="bottom">below the links</option>
+              </select>
+            </div>
           </div>
           <div class="mb-3">
             <span class="form-label d-block">Icon</span>

@@ -105,6 +105,8 @@
         bg: isHex(p.bg) ? p.bg : DEFAULT_BG,
         textColor: isHex(p.textColor) ? p.textColor : null,
         icon: ICON_SET.has(p.icon) ? p.icon : null,
+        description: typeof p.description === 'string' ? p.description.trim().slice(0, 2000) : '',
+        descPos: p.descPos === 'bottom' ? 'bottom' : 'top',
         links,
       };
     });
@@ -222,6 +224,7 @@
 
   function panelEl(p, i) {
     const fg = p.textColor || autoText(p.bg);
+    const desc = p.description ? h('div', { class: 'panel-desc panel-desc-' + p.descPos }, p.description) : null;
     return h('div', { class: 'col', 'data-panel-id': p.id },
       h('section', { class: 'card panel', style: 'background-color:' + p.bg + ';color:' + fg },
         h('div', { class: 'panel-header d-flex align-items-start gap-1' },
@@ -232,9 +235,11 @@
           iconBtn('panel-edit', 'pencil', 'Edit panel', 'edit-only'),
           iconBtn('panel-delete', 'trash', 'Delete panel', 'edit-only'),
           iconBtn('link-add', 'plus-lg', 'Add a link to this panel')),
+        p.descPos === 'top' && desc,
         h('ul', { class: 'links list-unstyled mb-0' },
           p.links.map((l, j) => linkEl(l, j, p.links.length)),
-          p.links.length === 0 && h('li', { class: 'empty-hint small' }, 'No links yet'))));
+          p.links.length === 0 && h('li', { class: 'empty-hint small' }, 'No links yet')),
+        p.descPos === 'bottom' && desc));
   }
 
   function linkEl(l, j, count) {
@@ -408,6 +413,8 @@
     gsel.replaceChildren(...state.groups.map((g) => h('option', { value: g.id }, g.name)));
     gsel.value = state.activeId;
     $('#panelTitle').value = p ? p.title : 'New Panel';
+    $('#panelDesc').value = p ? p.description : '';
+    $('#panelDescPos').value = p ? p.descPos : 'top';
     $('#panelBg').value = p ? p.bg : DEFAULT_BG;
     $('#textAuto').checked = !(p && p.textColor);
     $('#textCustom').checked = !!(p && p.textColor);
@@ -433,12 +440,14 @@
     setInvalid($('#panelTitle'), title ? null : 'Enter a title.');
     if (!title) return;
     const { bg, custom } = currentPanelColors();
+    const description = $('#panelDesc').value.trim();
+    const descPos = $('#panelDescPos').value;
     const textColor = custom ? $('#panelText').value : null;
     const destGroup = state.groups.find((g) => g.id === $('#panelGroup').value);
     let moved = false;
     if (panelCtx.panelId) {
       const panel = findPanel(panelCtx.panelId);
-      Object.assign(panel, { title, bg, textColor, icon: pickedIcon });
+      Object.assign(panel, { title, bg, textColor, icon: pickedIcon, description, descPos });
       if (destGroup !== curGroup()) {
         const src = curGroup().panels;
         src.splice(src.indexOf(panel), 1);
@@ -446,7 +455,7 @@
         moved = true;
       }
     } else {
-      destGroup.panels.push({ id: uid(), title, bg, textColor, icon: pickedIcon, links: [] });
+      destGroup.panels.push({ id: uid(), title, bg, textColor, icon: pickedIcon, description, descPos, links: [] });
       if (destGroup !== curGroup()) state.activeId = destGroup.id;
     }
     save();
@@ -518,7 +527,7 @@
       groups: state.groups.map((g) => ({
         name: g.name,
         panels: g.panels.map((p) => ({
-          title: p.title, bg: p.bg, textColor: p.textColor, icon: p.icon,
+          title: p.title, bg: p.bg, textColor: p.textColor, icon: p.icon, description: p.description, descPos: p.descPos,
           links: p.links.map((l) => ({ name: l.name, url: l.url })),
         })),
       })),
