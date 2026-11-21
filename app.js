@@ -48,7 +48,7 @@
   function iconBtn(action, iconName, label, extra = '', disabled = false) {
     return h('button', {
       type: 'button', class: 'icon-btn ' + extra, 'data-action': action,
-      title: label, 'aria-label': label, disabled,
+      'data-tip': label, 'aria-label': label, disabled,
     }, icon(iconName));
   }
 
@@ -192,6 +192,7 @@
     $('#addLinkBtn').disabled = panels.length === 0;
     $('#lastExported').textContent = 'Last exported: ' + (state.lastExported ? new Date(state.lastExported).toLocaleString() : 'never');
 
+    hideTips();
     $('#groupTabs').replaceChildren(...state.groups.map(tabEl), addTabEl());
     rootEl.replaceChildren(...panels.map(panelEl));
   }
@@ -209,7 +210,7 @@
 
   function addTabEl() {
     return h('li', { class: 'nav-item' },
-      h('button', { type: 'button', class: 'nav-link', 'data-action': 'group-add', title: 'New group', 'aria-label': 'New group' }, icon('plus-lg')));
+      h('button', { type: 'button', class: 'nav-link', 'data-action': 'group-add', 'data-tip': 'Add a new group (tab)', 'aria-label': 'Add a new group' }, icon('plus-lg')));
   }
 
   function panelEl(p, i) {
@@ -217,13 +218,13 @@
     return h('div', { class: 'col', 'data-panel-id': p.id },
       h('section', { class: 'card panel', style: 'background-color:' + p.bg + ';color:' + fg },
         h('div', { class: 'panel-header d-flex align-items-start gap-1' },
-          h('span', { class: 'icon-btn drag-handle edit-only pointer-only', 'data-drag': 'panel', draggable: 'true', title: 'Drag to re-order' }, icon('grip-vertical')),
+          h('span', { class: 'icon-btn drag-handle edit-only pointer-only', 'data-drag': 'panel', draggable: 'true', 'data-tip': 'Drag to re-order panels', 'aria-label': 'Drag to re-order panel' }, icon('grip-vertical')),
           h('h2', { class: 'h5 fw-semibold mb-0 flex-grow-1 text-break pt-1' }, p.icon && h('i', { class: 'bi bi-' + p.icon + ' me-2' }), p.title),
           iconBtn('panel-up', 'chevron-up', 'Move panel up', 'edit-only touch-only', i === 0),
           iconBtn('panel-down', 'chevron-down', 'Move panel down', 'edit-only touch-only', i === curGroup().panels.length - 1),
           iconBtn('panel-edit', 'pencil', 'Edit panel', 'edit-only'),
           iconBtn('panel-delete', 'trash', 'Delete panel', 'edit-only'),
-          iconBtn('link-add', 'plus-lg', 'Add link')),
+          iconBtn('link-add', 'plus-lg', 'Add a link to this panel')),
         h('ul', { class: 'links list-unstyled mb-0' },
           p.links.map((l, j) => linkEl(l, j, p.links.length)),
           p.links.length === 0 && h('li', { class: 'empty-hint small' }, 'No links yet'))));
@@ -352,7 +353,7 @@
     if (!append) { grid.replaceChildren(); iconShown = 0; grid.scrollTop = 0; }
     const batch = iconMatches.slice(iconShown, iconShown + ICON_PAGE);
     grid.append(...batch.map((name) => h('button', {
-      type: 'button', 'data-icon': name, title: name, 'aria-label': name,
+      type: 'button', 'data-icon': name, 'data-tip': name, 'aria-label': name,
       class: name === pickedIcon ? 'selected' : null,
     }, h('i', { class: 'bi bi-' + name }))));
     iconShown += batch.length;
@@ -737,6 +738,29 @@
   });
 
   tabsEl.addEventListener('dragend', () => { drag = null; clearDrag(); });
+
+  // ---------- tooltips ----------
+  // Any element with data-tip gets a Bootstrap tooltip. The DOM is rebuilt often,
+  // so tooltips are created on demand and cleared whenever they could be orphaned.
+
+  function hideTips() { document.querySelectorAll('.tooltip').forEach((t) => t.remove()); }
+
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if (!el || el.disabled) return;
+    bootstrap.Tooltip.getOrCreateInstance(el, { title: el.dataset.tip, trigger: 'manual', placement: 'bottom', container: 'body' }).show();
+  });
+  document.addEventListener('mouseout', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if (el) { const t = bootstrap.Tooltip.getInstance(el); if (t) t.hide(); }
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if (el && el.matches(':focus-visible')) bootstrap.Tooltip.getOrCreateInstance(el, { title: el.dataset.tip, trigger: 'manual', placement: 'bottom', container: 'body' }).show();
+  });
+  document.addEventListener('focusout', hideTips);
+  document.addEventListener('click', hideTips, true);
+  document.addEventListener('dragstart', hideTips);
 
   // ---------- init ----------
 

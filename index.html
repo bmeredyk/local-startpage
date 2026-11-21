@@ -75,17 +75,17 @@
     <div class="container-fluid gap-2">
       <span class="navbar-brand mb-0 h1"><i class="bi bi-house-heart me-2"></i>Startpage</span>
       <div class="d-flex flex-wrap gap-2 ms-auto">
-        <button id="addLinkBtn" class="btn btn-primary btn-sm" data-action="add-link-global" type="button">
+        <button id="addLinkBtn" class="btn btn-primary btn-sm" data-action="add-link-global" data-tip="Add a link to a panel in this group" type="button">
           <i class="bi bi-link-45deg"></i> Add link
         </button>
-        <button class="btn btn-outline-primary btn-sm" data-action="new-panel" type="button">
+        <button class="btn btn-outline-primary btn-sm" data-action="new-panel" data-tip="Create a new panel in this group" type="button">
           <i class="bi bi-plus-square"></i> New panel
         </button>
-        <button id="editBtn" class="btn btn-outline-secondary btn-sm" data-action="toggle-edit" type="button" aria-pressed="false">
+        <button id="editBtn" class="btn btn-outline-secondary btn-sm" data-action="toggle-edit" data-tip="Edit mode: re-order, rename and delete" type="button" aria-pressed="false">
           <i class="bi bi-pencil-square"></i> Edit
         </button>
         <div class="dropdown">
-          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-tip="Export or import your startpage" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="bi bi-hdd"></i> Data
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
@@ -186,7 +186,7 @@
               <button type="button" class="btn btn-outline-secondary" id="iconToggle" aria-expanded="false" aria-controls="iconPicker">
                 <i id="iconCurrent" class="bi bi-image"></i> <span id="iconCurrentName">None</span>
               </button>
-              <button type="button" class="btn btn-link btn-sm" id="iconClear">Clear</button>
+              <button type="button" class="btn btn-link btn-sm" id="iconClear" data-tip="Remove the icon">Clear</button>
             </div>
             <div id="iconPicker" class="border rounded p-2 mt-2 d-none">
               <input type="search" class="form-control form-control-sm mb-2" id="iconSearch" placeholder="Search icons (e.g. mail, github, cart)" autocomplete="off">
