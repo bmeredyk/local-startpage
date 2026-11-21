@@ -127,6 +127,8 @@ fa-icons.js         Generated list of Font Awesome Free names and search keyword
 vendor/             Bootstrap 5.3.3, Bootstrap Icons 1.11.3, Font Awesome Free 6.7.2
 tools/              Scripts that upgrade the icon sets and regenerate the two lists
 GLOSSARY.md         The project's vocabulary: Startpage, Group, Panel, Link, Edit mode
+LICENSE             MIT license for this project's own code
+THIRD_PARTY_NOTICES.md  Licenses and attributions for everything in vendor/
 ```
 
 `app.js` is a single script rather than ES modules because browsers block module imports on
@@ -152,4 +154,8 @@ All of it is vendored in `vendor/`, so the page works offline.
 | [Bootstrap Icons](https://icons.getbootstrap.com/) | 1.11.3 | MIT |
 | [Font Awesome Free](https://fontawesome.com/) | 6.7.2 | Icons CC BY 4.0, fonts SIL OFL 1.1, code MIT (see `vendor/fontawesome/LICENSE.txt`) |
 
-This project does not yet have a license of its own.
+The full license texts and required attributions are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE). The vendored libraries above keep their own licenses.

@@ -112,5 +112,9 @@ curl -fsSL -o vendor/bootstrap.bundle.min.js https://cdn.jsdelivr.net/npm/bootst
   repo first, and copy only what you need into `vendor/`.
 - Reference assets by relative path in `index.html`, then confirm it still works from `file://`.
 - Add the library to the README's third-party table with its version and license.
+- Add its full license text and any required attribution to `THIRD_PARTY_NOTICES.md`, and
+  check that the license is compatible with this project's MIT license (permissive licenses
+  are; copyleft ones such as GPL are not without further thought). Update the notice when
+  you upgrade a version. Icons and data derived from a library need the same attribution.
 - If a library has a large name list or metadata, generate a trimmed file with a script in
   `tools/` (like the icon generators) and document it in `tools/README.md`.
