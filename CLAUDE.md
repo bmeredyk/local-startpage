@@ -52,6 +52,25 @@ storage and from imported files as untrusted, and validate it in `sanitizeData`.
 data and old exports must keep loading, so give new fields a default and bump `version` only
 for a breaking change, with a migration in `sanitizeData`.
 
+## Deployment (GitHub Pages)
+
+The repo `bmeredyk/local-startpage` is public and served by GitHub Pages from the root of
+`main` at https://bmeredyk.github.io/local-startpage/. **Pushing `main` deploys it**, so treat
+a push as publishing: don't push unless asked.
+
+- The site lives under a **subpath**, so every asset must use a *relative* path (`vendor/...`,
+  `app.js`). Never use a leading `/`.
+- `.nojekyll` must stay, and `index.html` keeps `<meta name="robots" content="noindex, nofollow">`.
+  Don't remove either without asking.
+- `localStorage` there is keyed to `bmeredyk.github.io` and separate from the `file://` copy.
+  Links with a `file:` URL can't be opened from the hosted page. Keep the README's hosting
+  section accurate if any of this changes.
+- Commits must use the GitHub no-reply address (set in this repo's local git config), never a
+  real email. Pushing needs gh's credentials, because git has no credential helper:
+  `git -c credential.helper= -c credential.helper='!gh auth git-credential' push`.
+- After a deploy, hard-refresh to see changes (browsers cache `app.js`). Check the build with
+  `gh api repos/bmeredyk/local-startpage/pages/builds/latest --jq .status`.
+
 ## Running and testing
 
 There is no test suite. To check a change, serve the folder and use a browser:

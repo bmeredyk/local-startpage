@@ -64,6 +64,25 @@ appear on every Panel, Link and tab, and the page title gets a rename pencil:
 
 Click **Done** to leave Edit mode. While editing, clicking a link doesn't navigate.
 
+## Hosting on GitHub Pages
+
+The repo is also served as a static site at https://bmeredyk.github.io/local-startpage/
+(Pages, branch `main`, root folder). Pushing to `main` deploys it within about a minute. You
+can use that address as a homepage on any machine. Things to know:
+
+- **Data is still per browser.** It is never uploaded. A new browser starts empty, so move
+  your setup with **Data → Export JSON** and **Import JSON**. The hosted site and the
+  `file://` copy have separate storage.
+- **`file:` links don't work from the hosted page.** Browsers block web pages from opening
+  `file://` links. `http`, `https` and `mailto` links work.
+- **Storage is shared by every site under `bmeredyk.github.io`**, because `localStorage` is
+  keyed to the host, not the path. Don't host other sites there that you don't trust with
+  your startpage data, or move this one to a custom domain.
+- The site is public but carries a `noindex` tag, so well-behaved search engines skip it. It
+  contains only the app, so never commit personal links to the repo.
+- `.nojekyll` stops GitHub from processing the files, and every asset uses a relative path so
+  the page works under the `/local-startpage/` subpath.
+
 ## Your data
 
 Data lives in your browser's `localStorage` under the key `startpage.v1`. Nothing is sent
@@ -128,6 +147,7 @@ vendor/             Bootstrap 5.3.3, Bootstrap Icons 1.11.3, Font Awesome Free 6
 tools/              Scripts that upgrade the icon sets and regenerate the two lists
 GLOSSARY.md         The project's vocabulary: Startpage, Group, Panel, Link, Edit mode
 LICENSE             MIT license for this project's own code
+.nojekyll           Empty file telling GitHub Pages not to run Jekyll
 THIRD_PARTY_NOTICES.md  Licenses and attributions for everything in vendor/
 ```
 
