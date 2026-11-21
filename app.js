@@ -268,7 +268,8 @@
   }
 
   function linkEl(l, j, count) {
-    return h('li', { class: 'link-item d-flex align-items-center gap-1', 'data-link-id': l.id, draggable: editMode ? 'true' : null },
+    return h('li', { class: 'link-item d-flex align-items-center gap-1', 'data-link-id': l.id },
+      h('span', { class: 'icon-btn drag-handle edit-only pointer-only', 'data-drag': 'link', draggable: 'true', 'data-tip': 'Drag to re-order, or drop on another panel', 'aria-label': 'Drag to move link' }, icon('grip-vertical')),
       h('a', { class: 'link-name flex-grow-1 text-break', href: l.url, draggable: 'false' }, l.icon && iconEl(l.icon, 'me-2'), l.name),
       iconBtn('link-up', 'chevron-up', 'Move link up', 'edit-only touch-only', j === 0),
       iconBtn('link-down', 'chevron-down', 'Move link down', 'edit-only touch-only', j === count - 1),
@@ -757,18 +758,19 @@
 
   rootEl.addEventListener('dragstart', (e) => {
     if (!editMode) return;
-    const handle = e.target.closest('[data-drag="panel"]');
-    const li = e.target.closest('.link-item');
-    if (handle) {
+    // Only the grip handles start a drag, so text and buttons stay selectable and clickable.
+    const handle = e.target.closest('[data-drag]');
+    if (!handle) return;
+    if (handle.dataset.drag === 'panel') {
       const col = handle.closest('[data-panel-id]');
       drag = { type: 'panel', id: col.dataset.panelId };
       e.dataTransfer.setDragImage(col.firstElementChild, 20, 20);
       col.classList.add('dragging');
-    } else if (li) {
-      drag = { type: 'link', id: li.dataset.linkId };
-      li.classList.add('dragging');
     } else {
-      return;
+      const li = handle.closest('.link-item');
+      drag = { type: 'link', id: li.dataset.linkId };
+      e.dataTransfer.setDragImage(li, 12, 12);
+      li.classList.add('dragging');
     }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', drag.id);
