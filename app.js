@@ -4,9 +4,34 @@
   const STORAGE_KEY = 'startpage.v1';
   const DEFAULT_BG = '#cfd8e3';
   const SAFE_PROTOCOLS = ['http:', 'https:', 'file:', 'mailto:'];
-  const ICONS = window.BI_ICONS || [];
-  const ICON_SET = new Set(ICONS);
   const ICON_PAGE = 200;
+
+  // Icon sets. An icon is stored as "<set>:<name>", e.g. "bi:house" or "fab:github".
+  // A bare name (from before Font Awesome was added) means Bootstrap Icons.
+  const FA = window.FA_ICONS || { s: [], r: [], b: [] };
+  const ICON_SETS = [
+    { id: 'bi', label: 'Bootstrap', cls: (n) => 'bi bi-' + n, items: (window.BI_ICONS || []).map((n) => [n, '']) },
+    { id: 'fas', label: 'FA Solid', cls: (n) => 'fa-solid fa-fw fa-' + n, items: FA.s },
+    { id: 'far', label: 'FA Regular', cls: (n) => 'fa-regular fa-fw fa-' + n, items: FA.r },
+    { id: 'fab', label: 'FA Brands', cls: (n) => 'fa-brands fa-fw fa-' + n, items: FA.b },
+  ];
+  const ICON_BY_ID = new Map();
+  ICON_SETS.forEach((set) => set.items.forEach(([name, kw]) => {
+    const id = set.id + ':' + name;
+    ICON_BY_ID.set(id, { id, set, name, hay: (name + ' ' + kw).toLowerCase() });
+  }));
+  const ALL_ICONS = [...ICON_BY_ID.values()];
+
+  function normalizeIcon(v) {
+    if (typeof v !== 'string') return null;
+    if (ICON_BY_ID.has(v)) return v;
+    return ICON_BY_ID.has('bi:' + v) ? 'bi:' + v : null;
+  }
+
+  function iconEl(id, extra) {
+    const i = ICON_BY_ID.get(id);
+    return h('i', { class: i.set.cls(i.name) + (extra ? ' ' + extra : '') });
+  }
   const DEFAULT_TITLE = 'Startpage';
 
   const $ = (sel) => document.querySelector(sel);
@@ -97,14 +122,14 @@
         }
         const r = normalizeUrl(l.url);
         if (!r.ok) throw new Error('Panel "' + p.title + '", link "' + l.name + '": ' + r.error);
-        return { id: uid(), name: l.name.trim() || r.value, url: r.value, icon: ICON_SET.has(l.icon) ? l.icon : null };
+        return { id: uid(), name: l.name.trim() || r.value, url: r.value, icon: normalizeIcon(l.icon) };
       });
       return {
         id: uid(),
         title: p.title.trim() || 'Untitled',
         bg: isHex(p.bg) ? p.bg : DEFAULT_BG,
         textColor: isHex(p.textColor) ? p.textColor : null,
-        icon: ICON_SET.has(p.icon) ? p.icon : null,
+        icon: normalizeIcon(p.icon),
         description: typeof p.description === 'string' ? p.description.trim().slice(0, 2000) : '',
         descPos: p.descPos === 'bottom' ? 'bottom' : 'top',
         links,
@@ -229,7 +254,7 @@
       h('section', { class: 'card panel', style: 'background-color:' + p.bg + ';color:' + fg },
         h('div', { class: 'panel-header d-flex align-items-start gap-1' },
           h('span', { class: 'icon-btn drag-handle edit-only pointer-only', 'data-drag': 'panel', draggable: 'true', 'data-tip': 'Drag to re-order panels', 'aria-label': 'Drag to re-order panel' }, icon('grip-vertical')),
-          h('h2', { class: 'h5 fw-semibold mb-0 flex-grow-1 text-break pt-1' }, p.icon && h('i', { class: 'bi bi-' + p.icon + ' me-2' }), p.title),
+          h('h2', { class: 'h5 fw-semibold mb-0 flex-grow-1 text-break pt-1' }, p.icon && iconEl(p.icon, 'me-2'), p.title),
           iconBtn('panel-up', 'chevron-up', 'Move panel up', 'edit-only touch-only', i === 0),
           iconBtn('panel-down', 'chevron-down', 'Move panel down', 'edit-only touch-only', i === curGroup().panels.length - 1),
           iconBtn('panel-edit', 'pencil', 'Edit panel', 'edit-only'),
@@ -244,7 +269,7 @@
 
   function linkEl(l, j, count) {
     return h('li', { class: 'link-item d-flex align-items-center gap-1', 'data-link-id': l.id, draggable: editMode ? 'true' : null },
-      h('a', { class: 'link-name flex-grow-1 text-break', href: l.url, draggable: 'false' }, l.icon && h('i', { class: 'bi bi-' + l.icon + ' me-2' }), l.name),
+      h('a', { class: 'link-name flex-grow-1 text-break', href: l.url, draggable: 'false' }, l.icon && iconEl(l.icon, 'me-2'), l.name),
       iconBtn('link-up', 'chevron-up', 'Move link up', 'edit-only touch-only', j === 0),
       iconBtn('link-down', 'chevron-down', 'Move link down', 'edit-only touch-only', j === count - 1),
       iconBtn('link-edit', 'pencil', 'Edit link', 'edit-only'),
@@ -290,33 +315,36 @@
     let matches = [];
     let shown = 0;
 
-    const toggleIcon = h('i', { class: 'bi bi-image' });
+    const toggleIcon = h('span', {}, h('i', { class: 'bi bi-image' }));
     const toggleName = h('span', {}, 'None');
     const toggle = h('button', { type: 'button', class: 'btn btn-outline-secondary', 'aria-expanded': 'false' }, toggleIcon, ' ', toggleName);
     const clear = h('button', { type: 'button', class: 'btn btn-link btn-sm', 'data-tip': 'Remove the icon' }, 'Clear');
-    const search = h('input', { type: 'search', class: 'form-control form-control-sm mb-2', placeholder: 'Search icons (e.g. mail, github, cart)', autocomplete: 'off' });
+    const search = h('input', { type: 'search', class: 'form-control form-control-sm', placeholder: 'Search icons (e.g. mail, github, cart)', autocomplete: 'off' });
+    const setSel = h('select', { class: 'form-select form-select-sm w-auto', 'aria-label': 'Icon set' },
+      h('option', { value: 'all' }, 'All sets'), ...ICON_SETS.map((st) => h('option', { value: st.id }, st.label)));
     const grid = h('div', { class: 'icon-grid' });
     const count = h('span', { class: 'small text-body-secondary' });
     const more = h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary d-none' }, 'Show more');
     const panel = h('div', { class: 'border rounded p-2 mt-2 d-none' },
-      search, grid, h('div', { class: 'd-flex align-items-center gap-2 mt-2' }, count, more));
+      h('div', { class: 'd-flex gap-2 mb-2' }, search, setSel), grid, h('div', { class: 'd-flex align-items-center gap-2 mt-2' }, count, more));
     mount.replaceChildren(h('div', { class: 'd-flex align-items-center gap-2' }, toggle, clear), panel);
 
     const isOpen = () => !panel.classList.contains('d-none');
 
     function sync() {
-      toggleIcon.className = 'bi bi-' + (value || 'image');
-      toggleName.textContent = value || 'None';
+      const cur = value && ICON_BY_ID.get(value);
+      toggleIcon.replaceChildren(cur ? iconEl(value) : h('i', { class: 'bi bi-image' }));
+      toggleName.textContent = cur ? cur.name + ' · ' + cur.set.label : 'None';
       clear.disabled = !value;
     }
 
     function renderGrid(append) {
       if (!append) { grid.replaceChildren(); shown = 0; grid.scrollTop = 0; }
       const batch = matches.slice(shown, shown + ICON_PAGE);
-      grid.append(...batch.map((name) => h('button', {
-        type: 'button', 'data-icon': name, 'data-tip': name, 'aria-label': name,
-        class: name === value ? 'selected' : null,
-      }, h('i', { class: 'bi bi-' + name }))));
+      grid.append(...batch.map((item) => h('button', {
+        type: 'button', 'data-icon': item.id, 'data-tip': item.name + ' (' + item.set.label + ')', 'aria-label': item.name,
+        class: item.id === value ? 'selected' : null,
+      }, iconEl(item.id))));
       shown += batch.length;
       count.textContent = matches.length ? 'Showing ' + shown + ' of ' + matches.length : 'No icons match.';
       more.classList.toggle('d-none', shown >= matches.length);
@@ -324,7 +352,12 @@
 
     function filter() {
       const terms = search.value.toLowerCase().split(/\s+/).filter(Boolean);
-      matches = ICONS.filter((n) => terms.every((t) => n.includes(t)));
+      matches = ALL_ICONS.filter((i) => (setSel.value === 'all' || i.set.id === setSel.value) && terms.every((t) => i.hay.includes(t)));
+      // Icons whose name matches rank above ones that only match a keyword.
+      if (terms.length) {
+        const byName = (i) => (terms.every((t) => i.name.includes(t)) ? 0 : 1);
+        matches.sort((a, b) => byName(a) - byName(b));
+      }
       renderGrid(false);
     }
 
@@ -336,6 +369,7 @@
 
     toggle.addEventListener('click', () => setOpen(!isOpen()));
     search.addEventListener('input', filter);
+    setSel.addEventListener('change', filter);
     search.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
     more.addEventListener('click', () => renderGrid(true));
     clear.addEventListener('click', () => {
@@ -433,7 +467,7 @@
     prev.style.backgroundColor = bg;
     prev.style.color = fg;
     const ic = panelIcon.get();
-    prev.replaceChildren(...[ic && h('i', { class: 'bi bi-' + ic }), $('#panelTitle').value.trim() || 'Preview'].filter(Boolean));
+    prev.replaceChildren(...[ic && iconEl(ic), $('#panelTitle').value.trim() || 'Preview'].filter(Boolean));
   }
 
   const panelIcon = createIconPicker($('#panelIconPicker'), updatePanelPreview);
