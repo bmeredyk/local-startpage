@@ -743,20 +743,37 @@
   // Any element with data-tip gets a Bootstrap tooltip. The DOM is rebuilt often,
   // so tooltips are created on demand and cleared whenever they could be orphaned.
 
-  function hideTips() { document.querySelectorAll('.tooltip').forEach((t) => t.remove()); }
+  // One tooltip at a time. It is disposed (not just hidden) so a re-render or
+  // click can never leave an instance that believes it is still showing.
+  let tipEl = null;
+  let tipInst = null;
+
+  function hideTips() {
+    if (tipInst) tipInst.dispose();
+    tipInst = tipEl = null;
+    document.querySelectorAll('.tooltip').forEach((t) => t.remove());
+  }
+
+  function showTip(el) {
+    if (el === tipEl) return;
+    hideTips();
+    tipEl = el;
+    tipInst = new bootstrap.Tooltip(el, { title: el.dataset.tip, trigger: 'manual', placement: 'bottom', container: 'body', animation: false });
+    tipInst.show();
+  }
 
   document.addEventListener('mouseover', (e) => {
     const el = e.target.closest && e.target.closest('[data-tip]');
-    if (!el || el.disabled) return;
-    bootstrap.Tooltip.getOrCreateInstance(el, { title: el.dataset.tip, trigger: 'manual', placement: 'bottom', container: 'body' }).show();
+    if (el && !el.disabled) showTip(el);
   });
   document.addEventListener('mouseout', (e) => {
     const el = e.target.closest && e.target.closest('[data-tip]');
-    if (el) { const t = bootstrap.Tooltip.getInstance(el); if (t) t.hide(); }
+    // Moving between an element's own children (e.g. its icon) is not leaving it.
+    if (el && !el.contains(e.relatedTarget)) hideTips();
   });
   document.addEventListener('focusin', (e) => {
     const el = e.target.closest && e.target.closest('[data-tip]');
-    if (el && el.matches(':focus-visible')) bootstrap.Tooltip.getOrCreateInstance(el, { title: el.dataset.tip, trigger: 'manual', placement: 'bottom', container: 'body' }).show();
+    if (el && el.matches(':focus-visible')) showTip(el);
   });
   document.addEventListener('focusout', hideTips);
   document.addEventListener('click', hideTips, true);
