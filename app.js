@@ -7,12 +7,13 @@
   const ICONS = window.BI_ICONS || [];
   const ICON_SET = new Set(ICONS);
   const ICON_PAGE = 200;
+  const DEFAULT_TITLE = 'Startpage';
 
   const $ = (sel) => document.querySelector(sel);
   const rootEl = $('#panels');
 
   // state.groups[].panels[].links[]; activeId is the Group currently shown.
-  let state = { groups: [], activeId: null, lastExported: null };
+  let state = { title: DEFAULT_TITLE, groups: [], activeId: null, lastExported: null };
   let editMode = false;
   let drag = null;
   let storageWarned = false;
@@ -110,6 +111,8 @@
     return panels;
   }
 
+  const cleanTitle = (t) => (typeof t === 'string' && t.trim() ? t.trim().slice(0, 60) : DEFAULT_TITLE);
+
   function load() {
     let raw = null;
     try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { /* storage unavailable */ }
@@ -117,6 +120,7 @@
     try {
       const parsed = JSON.parse(raw);
       state.groups = sanitizeData(parsed);
+      state.title = cleanTitle(parsed.title);
       const active = state.groups[parsed.activeGroup];
       state.activeId = (active || state.groups[0]).id;
       state.lastExported = typeof parsed.lastExported === 'string' ? parsed.lastExported : null;
@@ -130,6 +134,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         version: 2,
+        title: state.title,
         lastExported: state.lastExported,
         activeGroup: state.groups.findIndex((g) => g.id === state.activeId),
         groups: state.groups,
@@ -193,6 +198,8 @@
     $('#lastExported').textContent = 'Last exported: ' + (state.lastExported ? new Date(state.lastExported).toLocaleString() : 'never');
 
     hideTips();
+    $('#siteTitle').textContent = state.title;
+    document.title = state.title;
     $('#groupTabs').replaceChildren(...state.groups.map(tabEl), addTabEl());
     rootEl.replaceChildren(...panels.map(panelEl));
   }
@@ -481,12 +488,31 @@
     groupModal.hide();
   });
 
+  // ---------- page title dialog ----------
+
+  const titleModal = bootstrap.Modal.getOrCreateInstance($('#titleModal'));
+
+  $('#titleModal').addEventListener('shown.bs.modal', () => { $('#siteTitleInput').focus(); $('#siteTitleInput').select(); });
+
+  $('#titleForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = $('#siteTitleInput');
+    const value = input.value.trim();
+    setInvalid(input, value ? null : 'Enter a title.');
+    if (!value) return;
+    state.title = cleanTitle(value);
+    save();
+    render();
+    titleModal.hide();
+  });
+
   // ---------- export / import ----------
 
   function exportJson() {
     state.lastExported = new Date().toISOString();
     const out = {
       version: 2,
+      title: state.title,
       exportedAt: state.lastExported,
       exportedFrom: location.href,
       groups: state.groups.map((g) => ({
@@ -512,9 +538,11 @@
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    let groups;
+    let groups, title;
     try {
-      groups = sanitizeData(JSON.parse(await file.text()));
+      const parsed = JSON.parse(await file.text());
+      groups = sanitizeData(parsed);
+      title = cleanTitle(parsed.title);
     } catch (err) {
       toast('Import failed: ' + (err instanceof SyntaxError ? 'that file is not valid JSON.' : err.message) + ' Nothing was changed.', { variant: 'danger', delay: 8000 });
       return;
@@ -527,6 +555,7 @@
     });
     if (!ok) return;
     state.groups = groups;
+    state.title = title;
     state.activeId = groups[0].id;
     editMode = false;
     save();
@@ -547,6 +576,7 @@
     switch (btn.dataset.action) {
       case 'toggle-edit': editMode = !editMode; render(); break;
       case 'new-panel': openPanelDialog(null); break;
+      case 'title-edit': $('#siteTitleInput').value = state.title; setInvalid($('#siteTitleInput'), null); titleModal.show(); break;
       case 'add-link-global': openLinkDialog({ panelId: curGroup().panels[0].id }); break;
       case 'group-select': state.activeId = btn.closest('[data-group-id]').dataset.groupId; save(); render(); break;
       case 'group-add': openGroupDialog(null); break;
