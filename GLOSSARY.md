@@ -8,7 +8,7 @@ A named set of Panels, shown as a tab across the top of the Startpage (for examp
 _Avoid_: tab, page. "Tab" is confused with a browser tab. It describes how a Group is displayed, not what it is.
 
 **Panel**
-A titled, colored box on the Startpage that holds an ordered list of Links. Has a title, a background color and (optionally) a text color. Panels can be re-ordered among themselves.
+A titled, colored box on the Startpage that holds an ordered list of Links. Has a title, an optional icon shown before the title, a background color and (optionally) a text color. Panels can be re-ordered among themselves.
 _Avoid_: section, column. Columns and rows describe how Panels are laid out, not a separate concept.
 
 **Link**

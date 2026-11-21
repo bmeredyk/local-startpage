@@ -4,6 +4,9 @@
   const STORAGE_KEY = 'startpage.v1';
   const DEFAULT_BG = '#cfd8e3';
   const SAFE_PROTOCOLS = ['http:', 'https:', 'file:', 'mailto:'];
+  const ICONS = window.BI_ICONS || [];
+  const ICON_SET = new Set(ICONS);
+  const ICON_PAGE = 200;
 
   const $ = (sel) => document.querySelector(sel);
   const rootEl = $('#panels');
@@ -100,6 +103,7 @@
         title: p.title.trim() || 'Untitled',
         bg: isHex(p.bg) ? p.bg : DEFAULT_BG,
         textColor: isHex(p.textColor) ? p.textColor : null,
+        icon: ICON_SET.has(p.icon) ? p.icon : null,
         links,
       };
     });
@@ -214,7 +218,7 @@
       h('section', { class: 'card panel', style: 'background-color:' + p.bg + ';color:' + fg },
         h('div', { class: 'panel-header d-flex align-items-start gap-1' },
           h('span', { class: 'icon-btn drag-handle edit-only pointer-only', 'data-drag': 'panel', draggable: 'true', title: 'Drag to re-order' }, icon('grip-vertical')),
-          h('h2', { class: 'h5 fw-semibold mb-0 flex-grow-1 text-break pt-1' }, p.title),
+          h('h2', { class: 'h5 fw-semibold mb-0 flex-grow-1 text-break pt-1' }, p.icon && h('i', { class: 'bi bi-' + p.icon + ' me-2' }), p.title),
           iconBtn('panel-up', 'chevron-up', 'Move panel up', 'edit-only touch-only', i === 0),
           iconBtn('panel-down', 'chevron-down', 'Move panel down', 'edit-only touch-only', i === curGroup().panels.length - 1),
           iconBtn('panel-edit', 'pencil', 'Edit panel', 'edit-only'),
@@ -332,8 +336,61 @@
     const prev = $('#panelPreview');
     prev.style.backgroundColor = bg;
     prev.style.color = fg;
-    prev.textContent = $('#panelTitle').value.trim() || 'Preview';
+    prev.replaceChildren(...[pickedIcon && h('i', { class: 'bi bi-' + pickedIcon }), $('#panelTitle').value.trim() || 'Preview'].filter(Boolean));
+    $('#iconCurrent').className = 'bi bi-' + (pickedIcon || 'image');
+    $('#iconCurrentName').textContent = pickedIcon || 'None';
+    $('#iconClear').disabled = !pickedIcon;
   }
+
+  // Icon picker: a searchable grid of Bootstrap Icons inside the Panel dialog.
+  let pickedIcon = null;
+  let iconMatches = [];
+  let iconShown = 0;
+
+  function renderIconGrid(append) {
+    const grid = $('#iconGrid');
+    if (!append) { grid.replaceChildren(); iconShown = 0; grid.scrollTop = 0; }
+    const batch = iconMatches.slice(iconShown, iconShown + ICON_PAGE);
+    grid.append(...batch.map((name) => h('button', {
+      type: 'button', 'data-icon': name, title: name, 'aria-label': name,
+      class: name === pickedIcon ? 'selected' : null,
+    }, h('i', { class: 'bi bi-' + name }))));
+    iconShown += batch.length;
+    $('#iconCount').textContent = iconMatches.length
+      ? 'Showing ' + iconShown + ' of ' + iconMatches.length
+      : 'No icons match.';
+    $('#iconMore').classList.toggle('d-none', iconShown >= iconMatches.length);
+  }
+
+  function filterIcons() {
+    const terms = $('#iconSearch').value.toLowerCase().split(/\s+/).filter(Boolean);
+    iconMatches = ICONS.filter((n) => terms.every((t) => n.includes(t)));
+    renderIconGrid(false);
+  }
+
+  function setIconPicker(open) {
+    $('#iconPicker').classList.toggle('d-none', !open);
+    $('#iconToggle').setAttribute('aria-expanded', String(open));
+    if (open) { filterIcons(); $('#iconSearch').focus(); }
+  }
+
+  $('#iconToggle').addEventListener('click', () => setIconPicker($('#iconPicker').classList.contains('d-none')));
+  $('#iconSearch').addEventListener('input', filterIcons);
+  $('#iconSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+  $('#iconMore').addEventListener('click', () => renderIconGrid(true));
+  $('#iconClear').addEventListener('click', () => {
+    pickedIcon = null;
+    updatePanelPreview();
+    if (!$('#iconPicker').classList.contains('d-none')) filterIcons();
+  });
+  $('#iconGrid').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-icon]');
+    if (!b) return;
+    pickedIcon = b.dataset.icon;
+    $('#iconGrid').querySelectorAll('.selected').forEach((x) => x.classList.remove('selected'));
+    b.classList.add('selected');
+    updatePanelPreview();
+  });
 
   function openPanelDialog(panelId) {
     const p = panelId ? findPanel(panelId) : null;
@@ -348,6 +405,9 @@
     $('#textCustom').checked = !!(p && p.textColor);
     $('#panelText').value = p && p.textColor ? p.textColor : autoText(p ? p.bg : DEFAULT_BG);
     setInvalid($('#panelTitle'), null);
+    pickedIcon = p ? p.icon : null;
+    $('#iconSearch').value = '';
+    setIconPicker(false);
     updatePanelPreview();
     panelModal.show();
   }
@@ -370,7 +430,7 @@
     let moved = false;
     if (panelCtx.panelId) {
       const panel = findPanel(panelCtx.panelId);
-      Object.assign(panel, { title, bg, textColor });
+      Object.assign(panel, { title, bg, textColor, icon: pickedIcon });
       if (destGroup !== curGroup()) {
         const src = curGroup().panels;
         src.splice(src.indexOf(panel), 1);
@@ -378,7 +438,7 @@
         moved = true;
       }
     } else {
-      destGroup.panels.push({ id: uid(), title, bg, textColor, links: [] });
+      destGroup.panels.push({ id: uid(), title, bg, textColor, icon: pickedIcon, links: [] });
       if (destGroup !== curGroup()) state.activeId = destGroup.id;
     }
     save();
@@ -431,7 +491,7 @@
       groups: state.groups.map((g) => ({
         name: g.name,
         panels: g.panels.map((p) => ({
-          title: p.title, bg: p.bg, textColor: p.textColor,
+          title: p.title, bg: p.bg, textColor: p.textColor, icon: p.icon,
           links: p.links.map((l) => ({ name: l.name, url: l.url })),
         })),
       })),

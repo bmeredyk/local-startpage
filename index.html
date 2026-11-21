@@ -58,6 +58,15 @@
     #groupTabs .nav-item.drop-right { box-shadow: 4px 0 0 0 var(--bs-primary) !important; }
     .editing #groupTabs .nav-item[draggable="true"] { cursor: grab; }
 
+    .icon-grid { display: flex; flex-wrap: wrap; gap: .25rem; max-height: 12rem; overflow-y: auto; }
+    .icon-grid button {
+      width: 2.5rem; height: 2.5rem; font-size: 1.2rem; padding: 0;
+      border: 1px solid transparent; border-radius: .375rem; background: transparent; color: inherit;
+    }
+    .icon-grid button:hover { background: var(--bs-secondary-bg); }
+    .icon-grid button.selected { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); }
+    #panelPreview .bi { margin-right: .5rem; }
+
     .toast-container { z-index: 2000; }
   </style>
 </head>
@@ -172,6 +181,23 @@
             <div class="invalid-feedback"></div>
           </div>
           <div class="mb-3">
+            <span class="form-label d-block">Icon</span>
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-outline-secondary" id="iconToggle" aria-expanded="false" aria-controls="iconPicker">
+                <i id="iconCurrent" class="bi bi-image"></i> <span id="iconCurrentName">None</span>
+              </button>
+              <button type="button" class="btn btn-link btn-sm" id="iconClear">Clear</button>
+            </div>
+            <div id="iconPicker" class="border rounded p-2 mt-2 d-none">
+              <input type="search" class="form-control form-control-sm mb-2" id="iconSearch" placeholder="Search icons (e.g. mail, github, cart)" autocomplete="off">
+              <div id="iconGrid" class="icon-grid"></div>
+              <div class="d-flex align-items-center gap-2 mt-2">
+                <span class="small text-body-secondary" id="iconCount"></span>
+                <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="iconMore">Show more</button>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
             <label for="panelGroup" class="form-label">Group</label>
             <select class="form-select" id="panelGroup"></select>
           </div>
@@ -224,6 +250,7 @@
   <input type="file" id="importFile" accept=".json,application/json" hidden>
 
   <script src="vendor/bootstrap.bundle.min.js"></script>
+  <script src="icons.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
