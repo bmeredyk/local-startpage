@@ -97,7 +97,7 @@
         }
         const r = normalizeUrl(l.url);
         if (!r.ok) throw new Error('Panel "' + p.title + '", link "' + l.name + '": ' + r.error);
-        return { id: uid(), name: l.name.trim() || r.value, url: r.value };
+        return { id: uid(), name: l.name.trim() || r.value, url: r.value, icon: ICON_SET.has(l.icon) ? l.icon : null };
       });
       return {
         id: uid(),
@@ -244,7 +244,7 @@
 
   function linkEl(l, j, count) {
     return h('li', { class: 'link-item d-flex align-items-center gap-1', 'data-link-id': l.id, draggable: editMode ? 'true' : null },
-      h('a', { class: 'link-name flex-grow-1 text-break', href: l.url, draggable: 'false' }, l.name),
+      h('a', { class: 'link-name flex-grow-1 text-break', href: l.url, draggable: 'false' }, l.icon && h('i', { class: 'bi bi-' + l.icon + ' me-2' }), l.name),
       iconBtn('link-up', 'chevron-up', 'Move link up', 'edit-only touch-only', j === 0),
       iconBtn('link-down', 'chevron-down', 'Move link down', 'edit-only touch-only', j === count - 1),
       iconBtn('link-edit', 'pencil', 'Edit link', 'edit-only'),
@@ -282,10 +282,91 @@
     dest.links.splice(t === -1 ? dest.links.length : t + (after ? 1 : 0), 0, link);
   }
 
+  // ---------- icon picker ----------
+  // A searchable grid of Bootstrap Icons, built inside `mount`. Used by the Panel and Link dialogs.
+
+  function createIconPicker(mount, onChange = () => {}) {
+    let value = null;
+    let matches = [];
+    let shown = 0;
+
+    const toggleIcon = h('i', { class: 'bi bi-image' });
+    const toggleName = h('span', {}, 'None');
+    const toggle = h('button', { type: 'button', class: 'btn btn-outline-secondary', 'aria-expanded': 'false' }, toggleIcon, ' ', toggleName);
+    const clear = h('button', { type: 'button', class: 'btn btn-link btn-sm', 'data-tip': 'Remove the icon' }, 'Clear');
+    const search = h('input', { type: 'search', class: 'form-control form-control-sm mb-2', placeholder: 'Search icons (e.g. mail, github, cart)', autocomplete: 'off' });
+    const grid = h('div', { class: 'icon-grid' });
+    const count = h('span', { class: 'small text-body-secondary' });
+    const more = h('button', { type: 'button', class: 'btn btn-sm btn-outline-secondary d-none' }, 'Show more');
+    const panel = h('div', { class: 'border rounded p-2 mt-2 d-none' },
+      search, grid, h('div', { class: 'd-flex align-items-center gap-2 mt-2' }, count, more));
+    mount.replaceChildren(h('div', { class: 'd-flex align-items-center gap-2' }, toggle, clear), panel);
+
+    const isOpen = () => !panel.classList.contains('d-none');
+
+    function sync() {
+      toggleIcon.className = 'bi bi-' + (value || 'image');
+      toggleName.textContent = value || 'None';
+      clear.disabled = !value;
+    }
+
+    function renderGrid(append) {
+      if (!append) { grid.replaceChildren(); shown = 0; grid.scrollTop = 0; }
+      const batch = matches.slice(shown, shown + ICON_PAGE);
+      grid.append(...batch.map((name) => h('button', {
+        type: 'button', 'data-icon': name, 'data-tip': name, 'aria-label': name,
+        class: name === value ? 'selected' : null,
+      }, h('i', { class: 'bi bi-' + name }))));
+      shown += batch.length;
+      count.textContent = matches.length ? 'Showing ' + shown + ' of ' + matches.length : 'No icons match.';
+      more.classList.toggle('d-none', shown >= matches.length);
+    }
+
+    function filter() {
+      const terms = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+      matches = ICONS.filter((n) => terms.every((t) => n.includes(t)));
+      renderGrid(false);
+    }
+
+    function setOpen(open) {
+      panel.classList.toggle('d-none', !open);
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) { filter(); search.focus(); }
+    }
+
+    toggle.addEventListener('click', () => setOpen(!isOpen()));
+    search.addEventListener('input', filter);
+    search.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+    more.addEventListener('click', () => renderGrid(true));
+    clear.addEventListener('click', () => {
+      value = null;
+      sync();
+      if (isOpen()) filter();
+      onChange(value);
+    });
+    grid.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-icon]');
+      if (!b) return;
+      value = b.dataset.icon;
+      grid.querySelectorAll('.selected').forEach((x) => x.classList.remove('selected'));
+      b.classList.add('selected');
+      sync();
+      onChange(value);
+    });
+
+    sync();
+    return {
+      get: () => value,
+      // Reset to a value without notifying; also closes and clears the search.
+      set(v) { value = v || null; search.value = ''; setOpen(false); sync(); },
+    };
+  }
+
   // ---------- link dialog ----------
 
   const linkModal = bootstrap.Modal.getOrCreateInstance($('#linkModal'));
   let linkCtx = null;
+  const linkIcon = createIconPicker($('#linkIconPicker'));
 
   function setInvalid(input, msg) {
     input.classList.toggle('is-invalid', !!msg);
@@ -298,6 +379,7 @@
     $('#linkModalTitle').textContent = link ? 'Edit link' : 'Add link';
     $('#linkName').value = link ? link.name : '';
     $('#linkUrl').value = link ? link.url : '';
+    linkIcon.set(link ? link.icon : null);
     setInvalid($('#linkName'), null);
     setInvalid($('#linkUrl'), null);
     const sel = $('#linkPanel');
@@ -323,9 +405,10 @@
       const link = src.links.find((l) => l.id === linkCtx.linkId);
       link.name = name;
       link.url = url.value;
+      link.icon = linkIcon.get();
       if (destId !== src.id) moveLink(link.id, destId, null, true);
     } else {
-      findPanel(destId).links.push({ id: uid(), name, url: url.value });
+      findPanel(destId).links.push({ id: uid(), name, url: url.value, icon: linkIcon.get() });
     }
     save();
     render();
@@ -349,61 +432,11 @@
     const prev = $('#panelPreview');
     prev.style.backgroundColor = bg;
     prev.style.color = fg;
-    prev.replaceChildren(...[pickedIcon && h('i', { class: 'bi bi-' + pickedIcon }), $('#panelTitle').value.trim() || 'Preview'].filter(Boolean));
-    $('#iconCurrent').className = 'bi bi-' + (pickedIcon || 'image');
-    $('#iconCurrentName').textContent = pickedIcon || 'None';
-    $('#iconClear').disabled = !pickedIcon;
+    const ic = panelIcon.get();
+    prev.replaceChildren(...[ic && h('i', { class: 'bi bi-' + ic }), $('#panelTitle').value.trim() || 'Preview'].filter(Boolean));
   }
 
-  // Icon picker: a searchable grid of Bootstrap Icons inside the Panel dialog.
-  let pickedIcon = null;
-  let iconMatches = [];
-  let iconShown = 0;
-
-  function renderIconGrid(append) {
-    const grid = $('#iconGrid');
-    if (!append) { grid.replaceChildren(); iconShown = 0; grid.scrollTop = 0; }
-    const batch = iconMatches.slice(iconShown, iconShown + ICON_PAGE);
-    grid.append(...batch.map((name) => h('button', {
-      type: 'button', 'data-icon': name, 'data-tip': name, 'aria-label': name,
-      class: name === pickedIcon ? 'selected' : null,
-    }, h('i', { class: 'bi bi-' + name }))));
-    iconShown += batch.length;
-    $('#iconCount').textContent = iconMatches.length
-      ? 'Showing ' + iconShown + ' of ' + iconMatches.length
-      : 'No icons match.';
-    $('#iconMore').classList.toggle('d-none', iconShown >= iconMatches.length);
-  }
-
-  function filterIcons() {
-    const terms = $('#iconSearch').value.toLowerCase().split(/\s+/).filter(Boolean);
-    iconMatches = ICONS.filter((n) => terms.every((t) => n.includes(t)));
-    renderIconGrid(false);
-  }
-
-  function setIconPicker(open) {
-    $('#iconPicker').classList.toggle('d-none', !open);
-    $('#iconToggle').setAttribute('aria-expanded', String(open));
-    if (open) { filterIcons(); $('#iconSearch').focus(); }
-  }
-
-  $('#iconToggle').addEventListener('click', () => setIconPicker($('#iconPicker').classList.contains('d-none')));
-  $('#iconSearch').addEventListener('input', filterIcons);
-  $('#iconSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
-  $('#iconMore').addEventListener('click', () => renderIconGrid(true));
-  $('#iconClear').addEventListener('click', () => {
-    pickedIcon = null;
-    updatePanelPreview();
-    if (!$('#iconPicker').classList.contains('d-none')) filterIcons();
-  });
-  $('#iconGrid').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-icon]');
-    if (!b) return;
-    pickedIcon = b.dataset.icon;
-    $('#iconGrid').querySelectorAll('.selected').forEach((x) => x.classList.remove('selected'));
-    b.classList.add('selected');
-    updatePanelPreview();
-  });
+  const panelIcon = createIconPicker($('#panelIconPicker'), updatePanelPreview);
 
   function openPanelDialog(panelId) {
     const p = panelId ? findPanel(panelId) : null;
@@ -420,9 +453,7 @@
     $('#textCustom').checked = !!(p && p.textColor);
     $('#panelText').value = p && p.textColor ? p.textColor : autoText(p ? p.bg : DEFAULT_BG);
     setInvalid($('#panelTitle'), null);
-    pickedIcon = p ? p.icon : null;
-    $('#iconSearch').value = '';
-    setIconPicker(false);
+    panelIcon.set(p ? p.icon : null);
     updatePanelPreview();
     panelModal.show();
   }
@@ -447,7 +478,7 @@
     let moved = false;
     if (panelCtx.panelId) {
       const panel = findPanel(panelCtx.panelId);
-      Object.assign(panel, { title, bg, textColor, icon: pickedIcon, description, descPos });
+      Object.assign(panel, { title, bg, textColor, icon: panelIcon.get(), description, descPos });
       if (destGroup !== curGroup()) {
         const src = curGroup().panels;
         src.splice(src.indexOf(panel), 1);
@@ -455,7 +486,7 @@
         moved = true;
       }
     } else {
-      destGroup.panels.push({ id: uid(), title, bg, textColor, icon: pickedIcon, description, descPos, links: [] });
+      destGroup.panels.push({ id: uid(), title, bg, textColor, icon: panelIcon.get(), description, descPos, links: [] });
       if (destGroup !== curGroup()) state.activeId = destGroup.id;
     }
     save();
@@ -528,7 +559,7 @@
         name: g.name,
         panels: g.panels.map((p) => ({
           title: p.title, bg: p.bg, textColor: p.textColor, icon: p.icon, description: p.description, descPos: p.descPos,
-          links: p.links.map((l) => ({ name: l.name, url: l.url })),
+          links: p.links.map((l) => ({ name: l.name, url: l.url, icon: l.icon })),
         })),
       })),
     };

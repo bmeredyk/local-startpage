@@ -140,6 +140,10 @@
             <input type="text" class="form-control" id="linkUrl" inputmode="url" autocomplete="off" placeholder="example.com">
             <div class="invalid-feedback"></div>
           </div>
+          <div class="mb-3">
+            <span class="form-label d-block">Icon <span class="text-body-secondary">(optional)</span></span>
+            <div id="linkIconPicker"></div>
+          </div>
           <div>
             <label for="linkPanel" class="form-label">Panel</label>
             <select class="form-select" id="linkPanel"></select>
@@ -223,20 +227,7 @@
           </div>
           <div class="mb-3">
             <span class="form-label d-block">Icon</span>
-            <div class="d-flex align-items-center gap-2">
-              <button type="button" class="btn btn-outline-secondary" id="iconToggle" aria-expanded="false" aria-controls="iconPicker">
-                <i id="iconCurrent" class="bi bi-image"></i> <span id="iconCurrentName">None</span>
-              </button>
-              <button type="button" class="btn btn-link btn-sm" id="iconClear" data-tip="Remove the icon">Clear</button>
-            </div>
-            <div id="iconPicker" class="border rounded p-2 mt-2 d-none">
-              <input type="search" class="form-control form-control-sm mb-2" id="iconSearch" placeholder="Search icons (e.g. mail, github, cart)" autocomplete="off">
-              <div id="iconGrid" class="icon-grid"></div>
-              <div class="d-flex align-items-center gap-2 mt-2">
-                <span class="small text-body-secondary" id="iconCount"></span>
-                <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="iconMore">Show more</button>
-              </div>
-            </div>
+            <div id="panelIconPicker"></div>
           </div>
           <div class="mb-3">
             <label for="panelGroup" class="form-label">Group</label>
